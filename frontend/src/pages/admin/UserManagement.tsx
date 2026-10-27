@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Edit2, Trash2, Search, X, Shield, Eye, UserPlus, Hash } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { database, ref, onValue, set, push } from "@/lib/firebase";
 import { remove } from "firebase/database";
 import { toast } from "sonner";
@@ -22,7 +22,7 @@ interface FirebaseUser {
 }
 
 const UserManagement = () => {
-  // Supabase users state
+  // System users state
   const [users, setUsers] = useState<DashboardUser[]>([]);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -40,12 +40,24 @@ const UserManagement = () => {
   const [fbSaving, setFbSaving] = useState(false);
   const [fbSearch, setFbSearch] = useState("");
 
-  // Fetch Supabase users
+  // Fetch system users from the Express API
   const fetchUsers = async () => {
-    const { data, error } = await supabase.functions.invoke("admin-api", {
-      body: { action: "list_users" },
-    });
-    if (!error && data?.users) setUsers(data.users);
+    try {
+      const res = await api.getFull("/users?limit=200");
+      const list: any[] = res?.data || [];
+      setUsers(
+        list.map((u) => ({
+          user_id: u._id,
+          name: u.name,
+          email: u.email,
+          role: u.role === "admin" ? "admin" : "viewer",
+          status: u.isActive === false ? "disabled" : "active",
+          created_at: u.createdAt,
+        })),
+      );
+    } catch {
+      toast.error("Failed to load users");
+    }
   };
 
   useEffect(() => { fetchUsers(); }, []);
@@ -69,7 +81,7 @@ const UserManagement = () => {
     return () => unsub();
   }, []);
 
-  // --- Supabase user handlers ---
+  // --- System user handlers ---
   const filtered = users.filter(
     (u) =>
       u.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -92,19 +104,23 @@ const UserManagement = () => {
     if (!form.name || !form.email) { toast.error("Please fill in all fields"); return; }
     setSaving(true);
     try {
+      const role = form.role === "admin" ? "admin" : "user";
       if (editUser) {
-        const { error } = await supabase.functions.invoke("admin-api", {
-          body: { action: "update_user", user_id: editUser.user_id, name: form.name, email: form.email, role: form.role, status: editUser.status },
+        await api.patch(`/users/${editUser.user_id}`, {
+          name: form.name,
+          email: form.email,
+          role,
+          isActive: editUser.status === "active",
         });
-        if (error) throw error;
         toast.success("User updated successfully");
       } else {
         if (!form.password) { toast.error("Password required"); setSaving(false); return; }
-        const { data, error } = await supabase.functions.invoke("admin-api", {
-          body: { action: "create_user", email: form.email, password: form.password, name: form.name, role: form.role },
+        await api.post("/users", {
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role,
         });
-        if (error) throw error;
-        if (data?.error) { toast.error(data.error); setSaving(false); return; }
         toast.success("User created successfully");
       }
       setModalOpen(false);
@@ -116,7 +132,7 @@ const UserManagement = () => {
 
   const handleDelete = async (userId: string) => {
     try {
-      await supabase.functions.invoke("admin-api", { body: { action: "delete_user", user_id: userId } });
+      await api.delete(`/users/${userId}`);
       toast.success("User deleted");
       setDeleteConfirm(null);
       fetchUsers();
@@ -125,11 +141,13 @@ const UserManagement = () => {
 
   const toggleStatus = async (u: DashboardUser) => {
     const newStatus = u.status === "active" ? "disabled" : "active";
-    await supabase.functions.invoke("admin-api", {
-      body: { action: "update_user", user_id: u.user_id, name: u.name, email: u.email, role: u.role, status: newStatus },
-    });
-    toast.success(`User ${newStatus === "active" ? "enabled" : "disabled"}`);
-    fetchUsers();
+    try {
+      await api.patch(`/users/${u.user_id}`, { isActive: newStatus === "active" });
+      toast.success(`User ${newStatus === "active" ? "enabled" : "disabled"}`);
+      fetchUsers();
+    } catch {
+      toast.error("Failed to update user status");
+    }
   };
 
   // --- Firebase device user handlers ---
@@ -264,7 +282,7 @@ const UserManagement = () => {
         </div>
       </div>
 
-      {/* ===== SYSTEM USERS (Supabase) ===== */}
+      {/* ===== SYSTEM USERS ===== */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
@@ -368,7 +386,7 @@ const UserManagement = () => {
         </div>
       </div>
 
-      {/* ===== Supabase Create/Edit Modal ===== */}
+      {/* ===== Create/Edit Modal ===== */}
       <AnimatePresence>
         {modalOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setModalOpen(false)}>
@@ -445,7 +463,7 @@ const UserManagement = () => {
         )}
       </AnimatePresence>
 
-      {/* ===== Supabase Delete Confirmation ===== */}
+      {/* ===== Delete Confirmation ===== */}
       <AnimatePresence>
         {deleteConfirm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDeleteConfirm(null)}>

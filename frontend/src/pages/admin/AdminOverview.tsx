@@ -2,36 +2,35 @@ import { motion } from "framer-motion";
 import { Users, Settings, BarChart3, Activity } from "lucide-react";
 import { useFirebaseData } from "@/hooks/useFirebaseData";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useEffect, useState } from "react";
+
+interface OverviewCounts {
+  users: number;
+  devices: number;
+  readings: number;
+  logs: number;
+  onlineDevices: number;
+  configs: number;
+}
 
 const AdminOverview = () => {
   const { data, connected } = useFirebaseData();
   const { user } = useAuth();
-  const [userCount, setUserCount] = useState<number | null>(null);
-  const [dataPoints, setDataPoints] = useState<number | null>(null);
-  const [configCount, setConfigCount] = useState<number | null>(null);
+  const [counts, setCounts] = useState<OverviewCounts | null>(null);
 
   useEffect(() => {
-    const fetchCounts = async () => {
-      const [profiles, temps, humidity, configs] = await Promise.all([
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase.from("temperature_history").select("id", { count: "exact", head: true }),
-        supabase.from("humidity_history").select("id", { count: "exact", head: true }),
-        supabase.from("system_config").select("id", { count: "exact", head: true }),
-      ]);
-      setUserCount(profiles.count ?? 0);
-      setDataPoints((temps.count ?? 0) + (humidity.count ?? 0));
-      setConfigCount(configs.count ?? 0);
-    };
-    fetchCounts();
+    api
+      .get("/admin/overview")
+      .then((res) => setCounts(res?.counts ?? null))
+      .catch(() => setCounts(null));
   }, []);
 
   const stats = [
     { label: "Active Devices", value: "6", icon: Activity, color: "text-primary" },
-    { label: "Users", value: userCount !== null ? String(userCount) : "…", icon: Users, color: "text-accent" },
-    { label: "Config Items", value: configCount !== null ? String(configCount) : "…", icon: Settings, color: "text-success" },
-    { label: "Data Points", value: dataPoints !== null ? String(dataPoints) : "…", icon: BarChart3, color: "text-info" },
+    { label: "Users", value: counts ? String(counts.users) : "…", icon: Users, color: "text-accent" },
+    { label: "Config Items", value: counts ? String(counts.configs) : "…", icon: Settings, color: "text-success" },
+    { label: "Data Points", value: counts ? String(counts.readings) : "…", icon: BarChart3, color: "text-info" },
   ];
 
   return (

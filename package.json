@@ -4,14 +4,15 @@
   "private": true,
   "description": "E-Wange smart home platform — React + Vite frontend, Node/Express + MongoDB backend",
   "scripts": {
-    "install:all": "npm install --prefix frontend && npm install --prefix backend",
-    "dev": "concurrently -n frontend,backend -c cyan,green \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
-    "dev:frontend": "npm run dev --prefix frontend",
-    "dev:backend": "npm run dev --prefix backend",
-    "build": "npm run build --prefix frontend",
-    "start": "npm start --prefix backend",
-    "db:seed": "npm run seed --prefix backend",
-    "db:reset": "npm run reset --prefix backend"
+    "install:all": "cd frontend && npm install && cd ../backend && npm install",
+    "dev": "concurrently -n frontend,backend -c cyan,green \"npm:dev:frontend\" \"npm:dev:backend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "db:seed": "cd backend && npm run seed",
+    "db:seeds": "cd backend && npm run seeds",
+    "db:reset": "cd backend && npm run reset"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

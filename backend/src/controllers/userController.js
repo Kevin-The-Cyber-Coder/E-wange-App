@@ -13,6 +13,35 @@ export const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const createUserSchema = z.object({
+  name: z.string().min(2).max(120),
+  email: z.string().email(),
+  password: z.string().min(6).max(128),
+  role: z.enum(["admin", "user", "guest"]).optional(),
+  phone: z.string().max(30).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const createUser = asyncHandler(async (req, res) => {
+  const { name, email, password, role, phone, isActive } = req.body;
+
+  const existing = await User.findOne({ email });
+  if (existing) {
+    throw ApiError.conflict("An account with that email already exists");
+  }
+
+  const user = await User.create({
+    name,
+    email,
+    password: await bcrypt.hash(password, 10),
+    role: role || "user",
+    phone: phone || "",
+    isActive: isActive ?? true,
+  });
+
+  res.status(201).json({ success: true, message: "User created", data: user });
+});
+
 export const listUsers = asyncHandler(async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 500);
   const page = Math.max(Number(req.query.page) || 1, 1);
@@ -80,4 +109,4 @@ export const deleteUser = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "User deleted", data: null });
 });
 
-export default { listUsers, getUser, updateUser, deleteUser };
+export default { listUsers, getUser, createUser, updateUser, deleteUser };

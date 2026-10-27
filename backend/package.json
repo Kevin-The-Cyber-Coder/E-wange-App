@@ -9,8 +9,9 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "seed": "node scripts/seed.js",
+    "seeds": "node seeds.js",
     "reset": "node scripts/reset.js",
-    "lint": "eslint src scripts"
+    "lint": "eslint src scripts seeds.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

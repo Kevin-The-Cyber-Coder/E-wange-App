@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSpeech } from "@/hooks/useSpeech";
 import { useAuth } from "@/hooks/useAuth";
+import { getToken } from "@/lib/api";
 import { database, ref, set } from "@/lib/firebase";
 import type { HomeData } from "@/hooks/useFirebaseData";
 import ReactMarkdown from "react-markdown";
@@ -21,7 +22,8 @@ interface ChatBotProps {
   homeData: HomeData;
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatbot`;
+const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
+const CHAT_URL = `${API_BASE}/ai/chat`;
 
 // Quick command matching for instant execution
 const QUICK_COMMANDS: { patterns: RegExp[]; key: string; value: string; response: string }[] = [
@@ -57,8 +59,14 @@ function tryQuickCommand(text: string, role: string, homeData: HomeData): { resp
     }
   }
 
+  // Yes/no questions ("is the lamp on?") are status queries, not commands —
+  // let the assistant answer them.
+  const yesNoQuestion =
+    /^(is|are|was|were|do|does|did|has|have|should)\b/i.test(text) ||
+    (/^(can|could|will|would)\b/i.test(text) && !/^(can|could|will|would)\s+you\b/i.test(text));
+
   // Check device commands
-  if (role !== "admin") return null;
+  if (role !== "admin" || yesNoQuestion) return null;
   for (const cmd of QUICK_COMMANDS) {
     if (cmd.patterns.some((p) => p.test(text))) {
       return { response: cmd.response, action: { key: cmd.key, value: cmd.value } };
@@ -67,12 +75,27 @@ function tryQuickCommand(text: string, role: string, homeData: HomeData): { resp
   return null;
 }
 
+// Only these values may be written to Firebase from chat replies.
+const ALLOWED_ACTIONS: Record<string, string[]> = {
+  lamp: ["ON", "OFF"],
+  fan: ["ON", "OFF"],
+  curtains: ["Open", "Closed", "Partial"],
+  water_pump: ["ON", "OFF"],
+  parking_gate: ["Open", "Closed"],
+  buzzer: ["ON", "OFF"],
+};
+
 function parseActions(text: string): { key: string; value: string }[] {
   const actions: { key: string; value: string }[] = [];
   const regex = /:::ACTION:::(.*?):::END:::/gs;
   let match;
   while ((match = regex.exec(text)) !== null) {
-    try { actions.push(JSON.parse(match[1])); } catch {}
+    try {
+      const parsed = JSON.parse(match[1]);
+      const key = String(parsed?.key ?? "");
+      const value = String(parsed?.value ?? "");
+      if (ALLOWED_ACTIONS[key]?.includes(value)) actions.push({ key, value });
+    } catch {}
   }
   return actions;
 }
@@ -106,10 +129,11 @@ export function ChatBot({ homeData }: ChatBotProps) {
   }, [commandFeedback]);
 
   const executeActions = useCallback((actions: { key: string; value: string }[]) => {
+    if (role !== "admin") return;
     for (const action of actions) {
       set(ref(database, `/${action.key}`), action.value);
     }
-  }, []);
+  }, [role]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -157,15 +181,20 @@ export function ChatBot({ homeData }: ChatBotProps) {
       };
 
       try {
+        const token = getToken();
         const resp = await fetch(CHAT_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-          body: JSON.stringify({ messages: newMessages.map((m) => ({ role: m.role, content: m.content })), homeData, userRole: role }),
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ messages: newMessages.map((m) => ({ role: m.role, content: cleanMessage(m.content) })), homeData, userRole: role }),
         });
 
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({ error: "Request failed" }));
-          toast({ title: "Error", description: err.error, variant: "destructive" });
+          const message = err.error || err.message || "Failed to get response.";
+          setMessages((prev) => [...prev, { role: "assistant", content: message }]);
           setCommandFeedback("error");
           setIsLoading(false);
           return;
@@ -206,7 +235,7 @@ export function ChatBot({ homeData }: ChatBotProps) {
           sonnerToast.success("Command executed");
         }
 
-        if (voiceMode && assistantText) speak(assistantText);
+        if (voiceMode && assistantText) speak(cleanMessage(assistantText));
       } catch (e) {
         console.error(e);
         toast({ title: "Error", description: "Failed to get response.", variant: "destructive" });
@@ -270,7 +299,7 @@ export function ChatBot({ homeData }: ChatBotProps) {
             exit={{ opacity: 0, y: 40, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-50 w-full sm:w-[380px] sm:max-w-[calc(100vw-2rem)] h-[100dvh] sm:h-[540px] sm:max-h-[calc(100vh-4rem)] flex flex-col sm:rounded-2xl border overflow-hidden"
-            style={{ background: "hsl(225 20% 8% / 0.95)", borderColor: "hsl(225 15% 20% / 0.5)", backdropFilter: "blur(24px)" }}
+            style={{ background: "hsl(var(--card) / 0.95)", borderColor: "hsl(var(--border) / 0.6)", backdropFilter: "blur(24px)" }}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
@@ -303,7 +332,7 @@ export function ChatBot({ homeData }: ChatBotProps) {
                   <p className="text-sm font-medium text-foreground mb-1">Hi! I'm E-wange AI</p>
                   <p className="text-xs text-muted-foreground mb-4">Say a command or ask a question</p>
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {["Lamp on", "Fan off", "Temperature", "Gate open"].map((q) => (
+                    {["Lamp on", "Status", "Temperature", "Gate open"].map((q) => (
                       <button key={q} onClick={() => sendMessage(q)} className="px-3 py-1.5 rounded-xl text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border transition-colors">
                         {q}
                       </button>
@@ -322,7 +351,7 @@ export function ChatBot({ homeData }: ChatBotProps) {
                     )}
                     <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${msg.role === "user" ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary text-secondary-foreground rounded-bl-md"}`}>
                       {msg.role === "assistant" ? (
-                        <div className="prose prose-sm prose-invert max-w-none [&>p]:m-0 [&>p]:leading-relaxed">
+                        <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:m-0 [&>p]:leading-relaxed [&>ul]:my-1 [&>ul]:pl-4 [&>ul]:list-disc">
                           <ReactMarkdown>{cleanMessage(msg.content)}</ReactMarkdown>
                         </div>
                       ) : msg.content}

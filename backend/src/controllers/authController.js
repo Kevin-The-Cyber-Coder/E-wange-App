@@ -15,7 +15,8 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email(),
+  // Accepts an email address or a user name.
+  email: z.string().min(1).max(160),
   password: z.string().min(1),
 });
 
@@ -56,7 +57,12 @@ export const register = asyncHandler(async (req, res) => {
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email }).select("+password");
+  const identifier = email.trim();
+  const query = identifier.includes("@")
+    ? { email: identifier.toLowerCase() }
+    : { name: identifier };
+
+  const user = await User.findOne(query).select("+password");
   if (!user || !user.isActive) {
     throw ApiError.unauthorized("Invalid email or password");
   }

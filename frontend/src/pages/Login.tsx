@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
 import { Activity, LogIn, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const Login = () => {
   const { login, user, loading: authLoading, role } = useAuth();
@@ -43,7 +44,7 @@ const Login = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background bg-mesh flex items-center justify-center">
+      <div className="min-h-screen bg-background bg-mesh flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -57,7 +58,10 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background bg-mesh flex items-center justify-center p-4">
+    <div className="relative min-h-screen bg-background bg-mesh flex items-center justify-center p-4">
+      <div className="absolute right-4 top-4 z-10">
+        <ThemeToggle />
+      </div>
       <AnimatePresence mode="wait">
         {!exiting && (
           <motion.div

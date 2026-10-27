@@ -1,9 +1,15 @@
-import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import api, { setToken, getToken } from "@/lib/api";
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   role: string;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -12,80 +18,71 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+interface LoginResponse {
+  user: {
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+  token: string;
+}
+
+const toAuthUser = (user: LoginResponse["user"]): AuthUser => ({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+});
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [role, setRole] = useState("viewer");
   const [loading, setLoading] = useState(true);
-  const initialized = useRef(false);
-  const resolvingRole = useRef(false);
 
-  const resolveRole = async (u: User | null) => {
-    // Prevent concurrent role resolution calls
-    if (resolvingRole.current) return;
-    resolvingRole.current = true;
+  // Restore the session from the stored JWT on first paint.
+  useEffect(() => {
+    let cancelled = false;
 
-    if (!u) {
-      setUser(null);
-      setRole("viewer");
+    if (!getToken()) {
       setLoading(false);
-      resolvingRole.current = false;
       return;
     }
-    setLoading(true);
-    setUser(u);
-    try {
-      const { data } = await supabase.rpc("is_admin");
-      setRole(data ? "admin" : "viewer");
-    } catch {
-      setRole("viewer");
-    }
-    setLoading(false);
-    resolvingRole.current = false;
-  };
 
-  useEffect(() => {
-    // Listen for auth changes FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Only resolve role on meaningful events, NOT on token refreshes
-      if (event === "TOKEN_REFRESHED") return;
-
-      initialized.current = true;
-      resolveRole(session?.user ?? null);
-    });
-
-    // Then get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!initialized.current) {
-        initialized.current = true;
-        resolveRole(session?.user ?? null);
-      }
-    });
-
-    // Safety timeout
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
+    api
+      .get("/auth/me")
+      .then((me) => {
+        if (cancelled || !me) return;
+        setUser({ id: me._id, name: me.name, email: me.email, role: me.role });
+        setRole(me.role);
+      })
+      .catch(() => {
+        setToken(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
+      cancelled = true;
     };
   }, []);
 
   const login = async (identifier: string, password: string) => {
-    let email = identifier;
-    // If not an email, look up email by name in profiles
-    if (!identifier.includes("@")) {
-      const { data, error: lookupError } = await supabase.rpc("get_email_by_name" as any, { _name: identifier });
-      if (lookupError || !data) throw new Error("User not found");
-      email = data as string;
-    }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    const data = (await api.post("/auth/login", {
+      email: identifier.trim(),
+      password,
+    })) as LoginResponse;
+
+    setToken(data.token);
+    setUser(toAuthUser(data.user));
+    setRole(data.user.role);
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    setToken(null);
+    setUser(null);
+    setRole("viewer");
   };
 
   return (

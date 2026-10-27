@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const navItems = [
   { id: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -95,6 +96,7 @@ export function AdminSidebar() {
         {navContent}
 
         <div className="mt-auto space-y-3">
+          <ThemeToggle full />
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-all duration-300"

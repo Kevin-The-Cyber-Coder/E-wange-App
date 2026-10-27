@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Save, RotateCcw, Thermometer, Flame, Car, Bell, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { toast } from "sonner";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -50,9 +50,11 @@ const SystemConfig = () => {
   const hasChanges = JSON.stringify(items.map(i => i.current)) !== JSON.stringify(original.map(i => i.current));
 
   useEffect(() => {
-    const fetch = async () => {
-      const { data, error } = await supabase.from("system_config").select("key, value");
-      if (error) {
+    const fetchConfig = async () => {
+      let data: { key: string; value: any }[];
+      try {
+        data = (await api.get("/config")) || [];
+      } catch {
         toast.error("Failed to load configuration");
         setLoading(false);
         return;
@@ -80,7 +82,7 @@ const SystemConfig = () => {
       setOriginal(JSON.parse(JSON.stringify(parsed)));
       setLoading(false);
     };
-    fetch();
+    fetchConfig();
   }, []);
 
   const updateItem = (key: string, value: any) => {
@@ -108,10 +110,7 @@ const SystemConfig = () => {
         if (item.max !== undefined) fullValue.max = item.max;
         if (item.unit) fullValue.unit = item.unit;
 
-        return supabase
-          .from("system_config")
-          .update({ value: fullValue, updated_at: new Date().toISOString() })
-          .eq("key", item.key);
+        return api.put(`/config/${item.key}`, { value: fullValue });
       });
       await Promise.all(updates);
       setOriginal(JSON.parse(JSON.stringify(items)));

@@ -1,8 +1,25 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Apply the saved theme before paint to avoid a flash of the wrong palette -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("e-wange.theme");
+          var theme =
+            stored === "light" || stored === "dark"
+              ? stored
+              : window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark";
+          document.documentElement.classList.remove("light", "dark");
+          document.documentElement.classList.add(theme);
+          document.documentElement.style.colorScheme = theme;
+        } catch (e) {}
+      })();
+    </script>
     <!-- TODO: Set the document title to the name of your application -->
     <title>E-wange</title>
     <meta name="description" content="Smart home">

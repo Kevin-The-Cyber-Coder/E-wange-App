@@ -5,7 +5,6 @@ import { ApiError } from "../utils/ApiError.js";
  * Central error handler. Every error funnels through here so the client
  * always receives the same JSON shape.
  */
-// eslint-disable-next-line no-unused-vars
 export function errorHandler(err, req, res, next) {
   let statusCode = err.statusCode || 500;
   let message = err.message || "Internal server error";

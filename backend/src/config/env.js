@@ -15,6 +15,10 @@ export const env = {
     .map((origin) => origin.trim())
     .filter(Boolean),
   isProd: (process.env.NODE_ENV || "development") === "production",
+  // Optional OpenAI-compatible provider used by the dashboard chat assistant.
+  aiApiKey: process.env.AI_API_KEY || "",
+  aiApiBase: (process.env.AI_API_BASE || "https://api.openai.com/v1").replace(/\/+$/, ""),
+  aiModel: process.env.AI_MODEL || "gpt-4o-mini",
 };
 
 export function validateEnv() {

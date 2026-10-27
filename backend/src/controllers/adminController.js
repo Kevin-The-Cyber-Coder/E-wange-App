@@ -3,17 +3,19 @@ import User from "../models/User.js";
 import Device from "../models/Device.js";
 import SensorReading from "../models/SensorReading.js";
 import ActivityLog from "../models/ActivityLog.js";
+import SystemConfig from "../models/SystemConfig.js";
 
 /**
  * Aggregated numbers for the admin overview dashboard.
  */
 export const overview = asyncHandler(async (req, res) => {
-  const [users, devices, readings, logs, onlineDevices] = await Promise.all([
+  const [users, devices, readings, logs, onlineDevices, configs] = await Promise.all([
     User.countDocuments(),
     Device.countDocuments(),
     SensorReading.countDocuments(),
     ActivityLog.countDocuments(),
     Device.countDocuments({ isOnline: true }),
+    SystemConfig.countDocuments(),
   ]);
 
   const latest = await SensorReading.findOne().sort({ recordedAt: -1 });
@@ -23,7 +25,7 @@ export const overview = asyncHandler(async (req, res) => {
     success: true,
     message: "Overview",
     data: {
-      counts: { users, devices, readings, logs, onlineDevices },
+      counts: { users, devices, readings, logs, onlineDevices, configs },
       latestReading: latest || null,
       recentLogs,
     },

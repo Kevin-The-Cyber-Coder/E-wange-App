@@ -149,11 +149,11 @@ const DataHistory = () => {
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(225 15% 16%)" />
-              <XAxis dataKey="time" tick={{ fill: "hsl(220 12% 50%)", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(220 12% 50%)", fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="time" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Line type="monotone" dataKey="temperature" name="Temperature" stroke="hsl(38 95% 55%)" strokeWidth={2} dot={{ r: 3 }} animationDuration={800} />
+              <Line type="monotone" dataKey="temperature" name="Temperature" stroke="hsl(var(--warning))" strokeWidth={2} dot={{ r: 3 }} animationDuration={800} />
             </LineChart>
           </ResponsiveContainer>
         ) : (
@@ -168,11 +168,11 @@ const DataHistory = () => {
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(225 15% 16%)" />
-              <XAxis dataKey="time" tick={{ fill: "hsl(220 12% 50%)", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(220 12% 50%)", fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="time" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Line type="monotone" dataKey="humidity" name="Humidity" stroke="hsl(210 100% 60%)" strokeWidth={2} dot={{ r: 3 }} animationDuration={800} />
+              <Line type="monotone" dataKey="humidity" name="Humidity" stroke="hsl(var(--info))" strokeWidth={2} dot={{ r: 3 }} animationDuration={800} />
             </LineChart>
           </ResponsiveContainer>
         ) : (

@@ -1,3 +1,4 @@
+import "../src/config/env.js";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { connectDB, disconnectDB } from "../src/config/db.js";
